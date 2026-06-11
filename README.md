@@ -2,6 +2,77 @@
 
 API REST para uma plataforma de comunidade. Permite que usuários se cadastrem, autentiquem, criem posts, comentem e votem, com controle de permissões por papel (`USER` / `ADMIN`).
 
+## Instalação passo a passo
+
+### Pré-requisitos
+
+| Ferramenta | Versão mínima |
+|---|---|
+| Node.js | 20.x |
+| npm | 9.x |
+
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/seu-usuario/ProjetoFeedBackHubAPI.git
+cd ProjetoFeedBackHubAPI
+```
+
+### 2. Instale as dependências
+
+```bash
+npm install
+```
+
+O `postinstall` já executa `prisma generate` automaticamente.
+
+### 3. Configure as variáveis de ambiente
+
+Copie o arquivo de exemplo e ajuste os valores:
+
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` com um segredo JWT forte:
+
+```env
+DATABASE_URL="file:../db/database.sqlite"
+JWT_SECRET=troque-por-uma-chave-forte-e-secreta
+PORT=3333
+NODE_ENV=development
+```
+
+### 4. Crie o banco de dados e aplique o schema
+
+```bash
+npx prisma db push
+```
+
+### 5. (Opcional) Popule dados de teste
+
+```bash
+npm run seed
+```
+
+Isso cria três usuários, dois posts, dois comentários e cinco votos:
+
+| E-mail | Senha | Papel |
+|---|---|---|
+| `admin@feedbackhub.com` | `admin123` | `ADMIN` |
+| `alice@feedbackhub.com` | `user123` | `USER` |
+| `bob@feedbackhub.com` | `user123` | `USER` |
+
+### 6. Inicie o servidor
+
+```bash
+npm run dev
+```
+
+O servidor sobe em `http://localhost:3333` por padrão.
+
+---
+
 ## Stack
 
 - Node.js 20+
@@ -25,7 +96,8 @@ API REST para uma plataforma de comunidade. Permite que usuários se cadastrem, 
 │   └── database.sqlite
 ├── prisma/
 │   ├── migrations/
-│   └── schema.prisma
+│   ├── schema.prisma
+│   └── seed.ts
 ├── src/
 │   ├── app.ts
 │   ├── env.ts
@@ -76,8 +148,9 @@ API REST para uma plataforma de comunidade. Permite que usuários se cadastrem, 
 │   │   └── fastify.d.ts
 │   └── utils/
 │       └── app-error.ts
-├── .env
+├── .env.example
 ├── .eslintrc.cjs
+├── .gitignore
 ├── .prettierrc.json
 ├── package.json
 ├── tsconfig.json
@@ -204,15 +277,19 @@ NODE_ENV=development
 | `npm run test:watch` | Sincroniza schema e inicia Vitest em modo watch |
 | `npm run lint` | Executa ESLint |
 
-## Bootstrap do banco
+## Rodando os testes
 
 ```bash
-npm install
-npx prisma generate
-npx prisma db push
+npm test
 ```
 
-O script de teste já executa `prisma db push --skip-generate` antes da suíte.
+O script sincroniza o schema antes de cada execução (`prisma db push --skip-generate`) e usa um banco separado (`db/test.database.sqlite`) para não interferir nos dados de desenvolvimento.
+
+Para modo watch (re-executa a cada mudança):
+
+```bash
+npm run test:watch
+```
 
 ## Autenticação
 

@@ -14,7 +14,11 @@
     "test": "prisma db push --skip-generate && vitest run",
     "test:watch": "prisma db push --skip-generate && vitest",
     "lint": "eslint . --ext .ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@fastify/jwt": "^9.0.1",
@@ -34,6 +38,7 @@
     "prettier": "^3.5.3",
     "prisma": "^6.8.0",
     "tsup": "^8.4.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.8.2",
     "vitest": "^3.0.8"
   }
