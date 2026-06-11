@@ -1,6 +1,6 @@
 # Feedback Hub API
 
-API REST para uma plataforma de feedback de comunidade. Permite que usuários se cadastrem, autentiquem e enviem feedbacks, com controle de permissões por papel (`USER` / `ADMIN`).
+API REST para uma plataforma de comunidade. Permite que usuários se cadastrem, autentiquem, criem posts, comentem e votem, com controle de permissões por papel (`USER` / `ADMIN`).
 
 ## Stack
 
@@ -32,7 +32,9 @@ API REST para uma plataforma de feedback de comunidade. Permite que usuários se
 │   ├── server.ts
 │   ├── controllers/
 │   │   ├── user.controller.ts
-│   │   └── feedback.controller.ts
+│   │   ├── post.controller.ts
+│   │   ├── comment.controller.ts
+│   │   └── vote.controller.ts
 │   ├── enums/
 │   │   └── user-role.ts
 │   ├── lib/
@@ -42,23 +44,34 @@ API REST para uma plataforma de feedback de comunidade. Permite que usuários se
 │   ├── repositories/
 │   │   ├── user-repository.ts
 │   │   ├── prisma-user-repository.ts
-│   │   ├── feedback-repository.ts
-│   │   └── prisma-feedback-repository.ts
+│   │   ├── post-repository.ts
+│   │   ├── prisma-post-repository.ts
+│   │   ├── comment-repository.ts
+│   │   ├── prisma-comment-repository.ts
+│   │   └── prisma-vote-repository.ts
 │   ├── routes/
 │   │   ├── users.ts
-│   │   └── feedbacks.ts
+│   │   ├── posts.ts
+│   │   └── comments.ts
 │   ├── schemas/
 │   │   ├── create-user.schema.ts
 │   │   ├── login.schema.ts
 │   │   ├── update-user.schema.ts
-│   │   ├── create-feedback.schema.ts
-│   │   └── update-feedback.schema.ts
+│   │   ├── create-post.schema.ts
+│   │   ├── update-post.schema.ts
+│   │   ├── create-comment.schema.ts
+│   │   ├── update-comment.schema.ts
+│   │   └── vote.schema.ts
 │   ├── services/
 │   │   ├── user.service.ts
-│   │   └── feedback.service.ts
+│   │   ├── post.service.ts
+│   │   ├── comment.service.ts
+│   │   └── vote.service.ts
 │   ├── tests/
 │   │   ├── users.spec.ts
-│   │   └── feedbacks.spec.ts
+│   │   ├── posts.spec.ts
+│   │   ├── comments.spec.ts
+│   │   └── votes.spec.ts
 │   ├── types/
 │   │   └── fastify.d.ts
 │   └── utils/
@@ -109,32 +122,55 @@ enum UserRole {
   ADMIN
 }
 
-enum FeedbackStatus {
-  OPEN
-  IN_PROGRESS
-  DONE
-}
-
 model User {
-  id           String     @id @default(cuid())
+  id           String    @id @default(cuid())
   name         String
-  email        String     @unique
+  email        String    @unique
   passwordHash String
-  role         UserRole   @default(USER)
-  karma        Int        @default(0)
-  createdAt    DateTime   @default(now())
-  feedbacks    Feedback[]
+  role         UserRole  @default(USER)
+  karma        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  posts        Post[]
+  comments     Comment[]
+  votes        Vote[]
 }
 
-model Feedback {
-  id          String         @id @default(cuid())
-  title       String
-  description String
-  status      FeedbackStatus @default(OPEN)
-  authorId    String
-  author      User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+model Post {
+  id        String    @id @default(cuid())
+  title     String
+  content   String
+  userId    String
+  score     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  author    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  votes     Vote[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  userId    String
+  postId    String
+  score     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  votes     Vote[]
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String?
+  commentId String?
+  value     Boolean
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
 }
 ```
 
@@ -145,7 +181,7 @@ model Feedback {
 - `passwordHash` jamais retorna na API.
 - `role` controla as políticas de autorização.
 - `karma` existe como campo preparado para evolução, sem automação neste escopo.
-- `onDelete: Cascade` garante que feedbacks sejam removidos ao deletar o autor.
+- `onDelete: Cascade` garante remoção em cascata ao deletar o autor.
 - `updatedAt` é gerenciado automaticamente pelo Prisma.
 
 ## Variáveis de ambiente
@@ -192,8 +228,8 @@ O payload do token carrega `sub` (id do usuário) e `role`. Respostas sem token 
 
 | Papel | Permissões |
 |---|---|
-| `USER` | Cria feedbacks; edita e deleta os próprios feedbacks e a própria conta |
-| `ADMIN` | Tudo do USER, mais: alterar status de qualquer feedback e gerenciar qualquer conta |
+| `USER` | Cria posts e comentários; edita e deleta os próprios recursos e a própria conta |
+| `ADMIN` | Tudo do USER, mais: gerenciar qualquer conta |
 
 Todo usuário criado via `POST /users` começa como `USER`.
 
@@ -360,8 +396,6 @@ Retorna o usuário atualizado (mesmo formato do `GET /users/:id`).
 
 Remove um usuário. **Requer JWT. Permissão: próprio usuário ou admin.**
 
-Ao deletar um usuário, todos os seus feedbacks são removidos automaticamente (`onDelete: Cascade`).
-
 #### Response `204`
 
 Sem corpo.
@@ -375,37 +409,30 @@ Sem corpo.
 
 ---
 
-## Endpoints — Feedbacks
+## Endpoints — Posts
 
-### `POST /feedbacks`
+### `POST /posts`
 
-Cria um feedback. **Requer JWT.** O autor é definido automaticamente pelo token.
+Cria um post. **Requer JWT.** O autor é definido automaticamente pelo token.
 
 #### Request body
 
 ```json
 {
-  "title": "Sugestão de melhoria",
-  "description": "Seria ótimo ter um modo escuro no sistema"
+  "title": "Título do post",
+  "content": "Conteúdo do post"
 }
 ```
-
-#### Validação
-
-| Campo | Regra |
-|---|---|
-| `title` | string, mínimo 5 caracteres após trim |
-| `description` | string, mínimo 10 caracteres após trim |
 
 #### Response `201`
 
 ```json
 {
   "id": "cm456...",
-  "title": "Sugestão de melhoria",
-  "description": "Seria ótimo ter um modo escuro no sistema",
-  "status": "OPEN",
-  "authorId": "cm123...",
+  "title": "Título do post",
+  "content": "Conteúdo do post",
+  "userId": "cm123...",
+  "score": 0,
   "createdAt": "2026-05-29T20:00:00.000Z",
   "updatedAt": "2026-05-29T20:00:00.000Z"
 }
@@ -413,108 +440,53 @@ Cria um feedback. **Requer JWT.** O autor é definido automaticamente pelo token
 
 ---
 
-### `GET /feedbacks`
+### `GET /posts`
 
-Lista feedbacks. **Rota pública.** Aceita filtro opcional por status.
-
-#### Query params
-
-| Parâmetro | Valores aceitos |
-|---|---|
-| `status` | `OPEN`, `IN_PROGRESS`, `DONE` |
-
-Exemplos:
-```
-GET /feedbacks
-GET /feedbacks?status=OPEN
-GET /feedbacks?status=IN_PROGRESS
-GET /feedbacks?status=DONE
-```
+Lista todos os posts. **Rota pública.**
 
 #### Response `200`
 
-Array de feedbacks, ordenados do mais recente ao mais antigo.
+Array de posts, ordenados do mais recente ao mais antigo.
 
 ---
 
-### `GET /feedbacks/:id`
+### `GET /posts/:id`
 
-Retorna um feedback pelo ID. **Rota pública.**
-
-#### Response `200`
-
-```json
-{
-  "id": "cm456...",
-  "title": "Sugestão de melhoria",
-  "description": "Seria ótimo ter um modo escuro no sistema",
-  "status": "OPEN",
-  "authorId": "cm123...",
-  "createdAt": "2026-05-29T20:00:00.000Z",
-  "updatedAt": "2026-05-29T20:00:00.000Z"
-}
-```
+Retorna um post pelo ID. **Rota pública.**
 
 #### Erros
 
 | Código | Mensagem |
 |---|---|
-| `404` | `Feedback não encontrado` |
+| `404` | `Post não encontrado` |
 
 ---
 
-### `PUT /feedbacks/:id`
+### `PUT /posts/:id`
 
-Atualiza um feedback. **Requer JWT.**
-
-#### Permissões por campo
-
-| Campo | USER (dono) | ADMIN |
-|---|---|---|
-| `title` | ✅ | ✅ |
-| `description` | ✅ | ✅ |
-| `status` | ❌ | ✅ |
-
-Não-donos (sem ser admin) recebem `403` em qualquer tentativa.
+Atualiza um post. **Requer JWT. Permissão: dono do post ou admin.**
 
 #### Request body
 
 ```json
 {
   "title": "Novo título",
-  "description": "Descrição atualizada",
-  "status": "IN_PROGRESS"
+  "content": "Novo conteúdo"
 }
 ```
-
-Envie apenas os campos que deseja alterar (mínimo um).
-
-#### Validação
-
-| Campo | Regra |
-|---|---|
-| `title` | opcional, mínimo 5 caracteres após trim |
-| `description` | opcional, mínimo 10 caracteres após trim |
-| `status` | opcional, um de: `OPEN`, `IN_PROGRESS`, `DONE` |
-
-#### Response `200`
-
-Retorna o feedback atualizado.
 
 #### Erros
 
 | Código | Mensagem |
 |---|---|
-| `400` | `Informe ao menos um campo para atualizar` |
-| `403` | `Sem permissão para editar este feedback` |
-| `403` | `Apenas administradores podem alterar o status` |
-| `404` | `Feedback não encontrado` |
+| `403` | `Sem permissão para editar este post` |
+| `404` | `Post não encontrado` |
 
 ---
 
-### `DELETE /feedbacks/:id`
+### `DELETE /posts/:id`
 
-Remove um feedback. **Requer JWT. Permissão: dono do feedback ou admin.**
+Remove um post. **Requer JWT. Permissão: dono do post ou admin.**
 
 #### Response `204`
 
@@ -524,8 +496,100 @@ Sem corpo.
 
 | Código | Mensagem |
 |---|---|
-| `403` | `Sem permissão para deletar este feedback` |
-| `404` | `Feedback não encontrado` |
+| `403` | `Sem permissão para deletar este post` |
+| `404` | `Post não encontrado` |
+
+---
+
+## Endpoints — Comentários
+
+### `POST /posts/:postId/comments`
+
+Cria um comentário em um post. **Requer JWT.**
+
+#### Request body
+
+```json
+{
+  "content": "Conteúdo do comentário"
+}
+```
+
+#### Response `201`
+
+```json
+{
+  "id": "cm789...",
+  "content": "Conteúdo do comentário",
+  "userId": "cm123...",
+  "postId": "cm456...",
+  "score": 0,
+  "createdAt": "2026-05-29T20:00:00.000Z",
+  "updatedAt": "2026-05-29T20:00:00.000Z"
+}
+```
+
+---
+
+### `GET /posts/:postId/comments`
+
+Lista comentários de um post. **Rota pública.**
+
+---
+
+### `PUT /comments/:id`
+
+Atualiza um comentário. **Requer JWT. Permissão: dono do comentário ou admin.**
+
+#### Request body
+
+```json
+{
+  "content": "Conteúdo atualizado"
+}
+```
+
+---
+
+### `DELETE /comments/:id`
+
+Remove um comentário. **Requer JWT. Permissão: dono do comentário ou admin.**
+
+#### Response `204`
+
+Sem corpo.
+
+---
+
+## Endpoints — Votos
+
+### `POST /posts/:postId/votes`
+
+Vota em um post. **Requer JWT.**
+
+#### Request body
+
+```json
+{
+  "value": true
+}
+```
+
+`true` = upvote, `false` = downvote.
+
+---
+
+### `POST /comments/:commentId/votes`
+
+Vota em um comentário. **Requer JWT.**
+
+#### Request body
+
+```json
+{
+  "value": true
+}
+```
 
 ---
 
@@ -563,32 +627,6 @@ Payload tipado em `src/types/fastify.d.ts`:
 
 Os testes usam `Fastify.inject()` para evitar dependência de porta TCP e cobrem o comportamento HTTP real da app. Os arquivos de teste rodam **em série** (`fileParallelism: false` no `vitest.config.ts`) por compartilharem o mesmo banco SQLite.
 
-### Cobertura atual
-
-**`users.spec.ts`**
-- Criação de usuário com persistência
-- Rejeição de e-mail duplicado
-- Rejeição de payload inválido
-- Login com credenciais válidas
-- Rejeição de login inválido
-- Proteção do `GET /users` sem token
-- Listagem autenticada
-
-**`feedbacks.spec.ts`**
-- Criação autenticada
-- Rejeição sem token
-- Rejeição de payload inválido
-- Listagem pública
-- Filtro por status
-- Busca por ID e 404
-- Atualização pelo dono
-- Rejeição de atualização por não-dono (403)
-- Rejeição de alteração de status por não-admin (403)
-- Alteração de status por admin
-- Exclusão pelo dono
-- Rejeição de exclusão por não-dono (403)
-- Exclusão por admin
-
 ## Segurança implementada
 
 - Senha criptografada com `bcryptjs` (12 rounds)
@@ -597,33 +635,3 @@ Os testes usam `Fastify.inject()` para evitar dependência de porta TCP e cobrem
 - Validação de payload antes da execução do service
 - Autorização por papel em operações sensíveis
 - Erros padronizados sem vazamento de detalhes internos
-
-## Checklist de conformidade
-
-- `POST /users`
-- `POST /login`
-- `GET /users`
-- `GET /users/:id`
-- `PUT /users/:id`
-- `DELETE /users/:id`
-- `POST /feedbacks`
-- `GET /feedbacks`
-- `GET /feedbacks?status=`
-- `GET /feedbacks/:id`
-- `PUT /feedbacks/:id`
-- `DELETE /feedbacks/:id`
-- Fastify
-- Prisma ORM 6
-- SQLite
-- Zod
-- JWT
-- `bcryptjs`
-- Repository Pattern
-- Tipagem forte com strict mode
-- Enum de papéis (`USER` / `ADMIN`)
-- Enum de status (`OPEN` / `IN_PROGRESS` / `DONE`)
-- Testes automatizados com Vitest
-- Erros padronizados
-- Hash de senha
-- Endpoints protegidos por JWT
-- Autorização por papel

@@ -24,8 +24,6 @@ import { env } from './env';
 import { prisma } from './lib/prisma';
 // Modulo responsavel pelas rotas de usuarios.
 import { usersRoutes } from './routes/users';
-// Modulo responsavel pelas rotas de feedbacks.
-import { feedbacksRoutes } from './routes/feedbacks';
 // Modulo responsavel pelas rotas de posts.
 import { postsRoutes } from './routes/posts';
 // Modulo responsavel pelas rotas de comentarios.
@@ -76,8 +74,6 @@ export function buildApp() {
 
   // Registra todas as rotas do modulo de usuarios.
   app.register(usersRoutes);
-  // Registra todas as rotas do modulo de feedbacks.
-  app.register(feedbacksRoutes);
   // Registra todas as rotas do modulo de posts.
   app.register(postsRoutes);
   // Registra todas as rotas do modulo de comentarios.
