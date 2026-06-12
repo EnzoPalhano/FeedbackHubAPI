@@ -610,7 +610,7 @@ Cria um comentário em um post. **Requer JWT.**
 
 ### `GET /posts/:postId/comments`
 
-Lista comentários de um post. **Rota pública.**
+Lista comentários de um post.
 
 ---
 
@@ -640,7 +640,7 @@ Sem corpo.
 
 ## Endpoints — Votos
 
-### `POST /posts/:postId/votes`
+### `POST /posts/:postId/vote`
 
 Vota em um post. **Requer JWT.**
 
@@ -656,7 +656,7 @@ Vota em um post. **Requer JWT.**
 
 ---
 
-### `POST /comments/:commentId/votes`
+### `POST /comments/:commentId/vote`
 
 Vota em um comentário. **Requer JWT.**
 
