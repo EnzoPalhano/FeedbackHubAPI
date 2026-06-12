@@ -519,7 +519,7 @@ Cria um post. **Requer JWT.** O autor é definido automaticamente pelo token.
 
 ### `GET /posts`
 
-Lista todos os posts. **Rota pública.**
+Lista todos os posts. 
 
 #### Response `200`
 
@@ -529,7 +529,7 @@ Array de posts, ordenados do mais recente ao mais antigo.
 
 ### `GET /posts/:id`
 
-Retorna um post pelo ID. **Rota pública.**
+Retorna um post pelo ID. 
 
 #### Erros
 
